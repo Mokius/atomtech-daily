@@ -1,0 +1,130 @@
+name: TechPulse Daily Newsletter
+
+on:
+  schedule:
+    # Every day at 10:00 AM UTC
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Issue date (YYYY-MM-DD, leave blank for today)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (generate files but do not commit)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    name: Generate Daily Newsletter
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python setup ──────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+
+      # ── 3. Determine date ────────────────────────────────────────
+      - name: Determine issue date
+        id: date
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            echo "date=${{ github.event.inputs.date }}" >> $GITHUB_OUTPUT
+          else
+            echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          fi
+
+      # ── 4. Configure git identity ────────────────────────────────
+      - name: Configure git identity
+        run: |
+          git config --global user.name "TechPulse Daily Bot"
+          git config --global user.email "techpulse-bot@users.noreply.github.com"
+
+      # ── 5. Generate newsletter ───────────────────────────────────
+      - name: Generate newsletter — ${{ steps.date.outputs.date }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          DRY_RUN_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          python scripts/generate_newsletter.py \
+            --date "${{ steps.date.outputs.date }}" \
+            --no-push \
+            $DRY_RUN_FLAG
+
+      # ── 6. Validate output ───────────────────────────────────────
+      - name: Validate issue quality
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          python scripts/validate_issue.py "${{ steps.date.outputs.date }}"
+
+      # ── 7. Push to GitHub ────────────────────────────────────────
+      - name: Push newsletter commits
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git push origin main
+
+      # ── 8. Summary ───────────────────────────────────────────────
+      - name: Write job summary
+        if: always()
+        run: |
+          DATE="${{ steps.date.outputs.date }}"
+          echo "## 📰 TechPulse Daily — $DATE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "issues/$DATE/index.md" ]; then
+            echo "### ✅ Issue generated successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+            for f in newsletter.md digest.md social-posts.md sources.md index.md; do
+              if [ -f "issues/$DATE/$f" ]; then
+                SIZE=$(wc -c < "issues/$DATE/$f")
+                echo "| $f | ${SIZE} bytes |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          else
+            echo "### ❌ Issue generation failed — check logs" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  notify-failure:
+    name: Notify on failure
+    runs-on: ubuntu-latest
+    needs: generate
+    if: failure()
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `❌ Newsletter generation failed — ${date}`,
+              body: `The daily newsletter workflow failed on ${date}.\n\nCheck the [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.`,
+              labels: ['automation-failure']
+            });
