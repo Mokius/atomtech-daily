@@ -2,735 +2,593 @@
 """
 TechPulse Daily — Newsletter Generation Script
 ===============================================
-Runs daily at 10:00 AM. Fetches news, generates all output files,
-validates quality, commits to git, and pushes to GitHub.
+Runs daily at 10:00 AM.
+
+Structure per issue:
+  issues/YYYY-MM-DD/
+    items/              ← ONE FILE + ONE COMMIT per news story
+      01-ai-gpt55.md
+      02-ai-deepseek-v4.md
+      ...
+    newsletter.md       ← Full newsletter (20 items grouped in 5 sections)
+    digest.md           ← TL;DR
+    social-posts.md     ← All social content aggregated
+    sources.md          ← Source table
+    index.md            ← Metadata
+
+Commit strategy:
+  news(ai): add GPT-5.5 release summary          ← per item
+  news(security): add Defender zero-day report   ← per item
+  ...
+  daily: add YYYY-MM-DD full newsletter          ← aggregate
+  daily: update YYYY-MM-DD index                 ← aggregate
 
 Usage:
     python generate_newsletter.py [--date YYYY-MM-DD] [--dry-run] [--no-push]
 
-Environment variables required:
-    ANTHROPIC_API_KEY   — Claude API key for content generation
-    GITHUB_TOKEN        — For authenticated pushes (set in Actions secrets)
-    GITHUB_REPO         — e.g. "username/techpulse-daily"
-    TAVILY_API_KEY      — (optional) Enhanced news search
+Env vars:
+    ANTHROPIC_API_KEY
+    GITHUB_REPO   e.g. "Mokius/techpulse-daily"
 """
 
-import os
-import sys
-import json
-import time
-import argparse
-import subprocess
-import hashlib
-from datetime import datetime, timedelta, timezone
+import os, sys, json, time, re, hashlib, argparse, subprocess
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import anthropic
 
-# ─────────────────────────────────────────────
-# Configuration
-# ─────────────────────────────────────────────
+REPO_ROOT   = Path(__file__).parent.parent
+ISSUES_DIR  = REPO_ROOT / "issues"
+MIN_ITEMS   = 18
+MAX_ITEMS   = 25
 
-REPO_ROOT = Path(__file__).parent.parent
-ISSUES_DIR = REPO_ROOT / "issues"
-TEMPLATES_DIR = REPO_ROOT / "templates"
-SOURCES_DIR = REPO_ROOT / "sources"
-
-MIN_ITEMS = 18
-MAX_ITEMS = 25
-
-CATEGORIES = [
-    ("ai", "🤖 Artificial Intelligence"),
-    ("engineering", "💻 Software Engineering"),
-    ("robotics", "🦾 Robotics"),
-    ("science", "🔬 Science"),
-    ("devtools", "🛠️ Developer Tools"),
-    ("security", "🔐 Cybersecurity"),
-    ("cloud", "☁️ Cloud & Infrastructure"),
-    ("hardware", "💾 Hardware"),
-    ("startups", "🚀 Startups & Products"),
-    ("research", "📄 Research Papers"),
+SECTIONS = [
+    ("ai_research",   "🤖 AI & Machine Learning",      ["ai", "research"]),
+    ("engineering",   "💻 Engineering & Dev Tools",     ["engineering", "devtools"]),
+    ("science_hw",    "🔬 Science & Hardware",          ["science", "hardware"]),
+    ("security",      "🔐 Security & Infrastructure",   ["security", "cloud"]),
+    ("startups",      "🚀 Startups, Robotics & More",   ["startups", "robotics"]),
 ]
 
-SEARCH_QUERIES = [
-    "artificial intelligence breakthrough 2026",
-    "new AI model released 2026",
-    "large language model research 2026",
-    "software engineering tools release 2026",
-    "robotics automation announcement 2026",
-    "scientific discovery breakthrough 2026",
-    "cybersecurity vulnerability exploit 2026",
-    "cloud infrastructure kubernetes release 2026",
-    "semiconductor chip hardware announcement 2026",
-    "tech startup funding launch 2026",
-    "machine learning research paper 2026",
-    "developer tools IDE framework 2026",
-    "open source release GitHub 2026",
-    "quantum computing progress 2026",
-    "space science discovery 2026",
-]
+CATEGORY_EMOJI = {
+    "ai": "🤖", "research": "📄", "engineering": "💻",
+    "devtools": "🛠️", "science": "🔬", "hardware": "💾",
+    "security": "🔐", "cloud": "☁️", "startups": "🚀", "robotics": "🦾",
+}
 
-TRUSTED_DOMAINS = [
-    "arxiv.org", "nature.com", "science.org", "technologyreview.com",
-    "openai.com", "anthropic.com", "deepmind.google", "huggingface.co",
-    "github.blog", "techcrunch.com", "arstechnica.com", "theverge.com",
-    "bleepingcomputer.com", "krebsonsecurity.com", "ieee.org",
-    "aws.amazon.com", "cloud.google.com", "azure.microsoft.com",
-    "venturebeat.com", "wired.com", "scientificamerican.com",
-    "infoq.com", "semianalysis.com", "spectrum.ieee.org",
-]
-
-BLOCKLISTED_PATTERNS = [
+BLOCKLIST = [
     "click here", "you won't believe", "shocking", "insane",
-    "mind-blowing", "epic fail", "celebrities", "viral",
-    "top 10 reasons", "this one trick",
+    "mind-blowing", "epic fail", "viral", "top 10 reasons",
 ]
 
 
-# ─────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────
+# ── helpers ──────────────────────────────────────────────────────────────────
 
-def log(msg: str, level: str = "INFO"):
-    ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] [{level}] {msg}", flush=True)
+def log(msg, level="INFO"):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] [{level}] {msg}", flush=True)
 
+def slugify(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    text = re.sub(r"-+", "-", text).strip("-")
+    return text[:50]
 
-def run_git(args: list[str], cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git"] + args,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+def run_git(args, cwd=REPO_ROOT):
+    return subprocess.run(["git"] + args, cwd=cwd,
+                          capture_output=True, text=True, check=True)
 
+def commit_file(path: Path, message: str):
+    try:
+        run_git(["add", str(path)])
+        run_git(["commit", "-m", message])
+        log(f"  ✔ {message}")
+    except subprocess.CalledProcessError as e:
+        log(f"  ↷ skip (nothing to commit): {e.stderr.strip()}", "WARN")
 
-def get_issue_number() -> int:
-    """Count existing issues to determine current issue number."""
+def get_issue_number():
     if not ISSUES_DIR.exists():
         return 1
-    existing = sorted(ISSUES_DIR.glob("????-??-??"))
-    return len(existing) + 1
+    return len(sorted(ISSUES_DIR.glob("????-??-??"))) + 1
 
-
-def deduplicate_items(items: list[dict]) -> list[dict]:
-    """Remove items with identical or near-identical headlines."""
-    seen_hashes = set()
-    unique = []
+def deduplicate(items):
+    seen, out = set(), []
     for item in items:
-        # Hash on normalized headline
-        key = hashlib.md5(
-            item["headline"].lower().strip().encode()
-        ).hexdigest()
-        if key not in seen_hashes:
-            seen_hashes.add(key)
-            unique.append(item)
+        key = hashlib.md5(item["headline"].lower().strip().encode()).hexdigest()
+        if key not in seen:
+            seen.add(key); out.append(item)
         else:
-            log(f"  ↳ Duplicate removed: {item['headline'][:60]}...", "WARN")
-    return unique
+            log(f"  dup removed: {item['headline'][:50]}", "WARN")
+    return out
 
-
-def is_clickbait(headline: str) -> bool:
-    h = headline.lower()
-    return any(p in h for p in BLOCKLISTED_PATTERNS)
-
-
-def quality_check(items: list[dict]) -> tuple[bool, list[str]]:
-    """Run quality checks. Returns (passed, list_of_issues)."""
+def quality_check(items):
     issues = []
-
-    if len(items) < MIN_ITEMS:
-        issues.append(f"Too few items: {len(items)} (min {MIN_ITEMS})")
-    if len(items) > MAX_ITEMS:
-        issues.append(f"Too many items: {len(items)} (max {MAX_ITEMS})")
-
+    if len(items) < MIN_ITEMS: issues.append(f"Too few items: {len(items)}")
+    if len(items) > MAX_ITEMS: issues.append(f"Too many items: {len(items)}")
+    required = ["headline","summary","why_it_matters","concept","future_impact",
+                "source_url","category","hook","instagram_caption","hashtags",
+                "linkedin_post","twitter_post"]
     for i, item in enumerate(items, 1):
-        required = ["headline", "summary", "why_it_matters", "concept",
-                    "future_impact", "source_url", "category", "social_angle"]
         missing = [f for f in required if not item.get(f)]
-        if missing:
-            issues.append(f"Item {i} missing fields: {missing}")
-
-        if is_clickbait(item.get("headline", "")):
-            issues.append(f"Item {i} may be clickbait: {item['headline'][:60]}")
-
-        url = item.get("source_url", "")
-        if url and not url.startswith("http"):
-            issues.append(f"Item {i} has invalid URL: {url}")
-
+        if missing: issues.append(f"Item {i} missing: {missing}")
+        if not item.get("source_url","").startswith("http"):
+            issues.append(f"Item {i} bad URL: {item.get('source_url','')}")
+        h = item.get("headline","").lower()
+        if any(p in h for p in BLOCKLIST):
+            issues.append(f"Item {i} clickbait: {item['headline'][:50]}")
     return len(issues) == 0, issues
 
 
-# ─────────────────────────────────────────────
-# News Fetching
-# ─────────────────────────────────────────────
+# ── news fetching ─────────────────────────────────────────────────────────────
 
-def fetch_news_raw(client: anthropic.Anthropic, date: str) -> str:
-    """
-    Use Claude's web search tool to collect real news from the last 24 hours.
-    Returns raw text with headlines, summaries, and URLs.
-    """
-    log("Fetching news via web search...")
-
+def fetch_news(client, date):
+    log("Fetching news via web search…")
     yesterday = (datetime.fromisoformat(date) - timedelta(days=1)).strftime("%Y-%m-%d")
-
     prompt = f"""You are a research assistant collecting technology news published between {yesterday} and {date}.
 
-Search for the most important and relevant stories across these categories:
-- Artificial Intelligence (new models, research, agents, safety)
-- Software Engineering (tools, frameworks, languages, open source)
-- Robotics (new robots, automation, embodied AI)
-- Scientific breakthroughs (physics, biology, space, medicine)
-- Developer Tools (IDEs, APIs, CLIs, frameworks)
+Search for the most important stories across:
+- AI / Machine Learning (new models, agents, safety, research papers)
+- Software Engineering (tools, frameworks, open source)
+- Robotics (new robots, embodied AI, automation)
+- Science (physics, biology, space, medicine)
+- Developer Tools (IDEs, APIs, CLIs)
 - Cybersecurity (vulnerabilities, breaches, defenses)
-- Cloud & Infrastructure (AWS, GCP, Azure, Kubernetes, DevOps)
-- Hardware (chips, GPUs, quantum computing, devices)
-- Startups & Products (launches, funding rounds, pivots)
-- Research Papers (key preprints and publications)
+- Cloud & Infrastructure (AWS, GCP, Azure, Kubernetes)
+- Hardware (chips, GPUs, quantum)
+- Startups & Products (launches, funding)
 
-For each story found, provide:
-- HEADLINE: exact headline
-- URL: full source URL
-- DOMAIN: source domain name
-- DATE: publication date
-- CATEGORY: one of [ai, engineering, robotics, science, devtools, security, cloud, hardware, startups, research]
-- BRIEF: 2-3 sentence description
+For each story:
+HEADLINE: exact title
+URL: full source URL
+DOMAIN: domain.com
+DATE: publication date
+CATEGORY: ai|engineering|robotics|science|devtools|security|cloud|hardware|startups|research
+BRIEF: 2-3 sentence description
 
-Find at least 25-30 stories. Prioritize stories from authoritative sources.
-Exclude clickbait, duplicate stories, and low-quality content.
-Only include real, verifiable stories published in the last 24 hours."""
+Find 25-30 stories from authoritative sources only.
+Exclude clickbait, duplicates, low-quality content."""
 
-    message = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=8000,
+    msg = client.messages.create(
+        model="claude-opus-4-5", max_tokens=8000,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
     )
-
-    # Collect all text from the response
-    full_text = ""
-    for block in message.content:
-        if hasattr(block, "text"):
-            full_text += block.text + "\n"
-
-    log(f"  ↳ Raw news collected ({len(full_text)} chars)")
-    return full_text
+    raw = "\n".join(b.text for b in msg.content if hasattr(b, "text"))
+    log(f"  ↳ {len(raw)} chars collected")
+    return raw
 
 
-# ─────────────────────────────────────────────
-# Content Generation
-# ─────────────────────────────────────────────
+# ── content generation ────────────────────────────────────────────────────────
 
-def generate_newsletter_items(
-    client: anthropic.Anthropic,
-    raw_news: str,
-    date: str,
-) -> list[dict]:
-    """
-    Transform raw news into structured newsletter items using Claude.
-    Returns a list of item dicts.
-    """
-    log("Generating structured newsletter items...")
+def generate_items(client, raw_news, date):
+    log("Generating structured items with per-item social content…")
+    prompt = f"""You are a professional technology newsletter editor. Today is {date}.
 
-    prompt = f"""You are a professional technology newsletter editor.
-Today is {date}. You have collected the following raw news:
-
+Source material:
 ---
 {raw_news}
 ---
 
-Transform this into exactly 20 high-quality newsletter items.
-For each item, generate a JSON object with these exact fields:
+Generate exactly 20 newsletter items. Each item must be a JSON object with these exact fields:
 
 {{
-  "headline": "Clear, professional headline (not clickbait)",
-  "category": "one of: ai|engineering|robotics|science|devtools|security|cloud|hardware|startups|research",
-  "category_label": "Human-readable category name with emoji",
-  "impact_level": "one of: 🔴 High | 🟡 Medium | 🟢 Notable",
-  "summary": "2-3 sentence factual summary of what happened",
-  "why_it_matters": "2-3 sentences on the significance and implications",
-  "concept": "1-2 sentence plain-English explanation for someone without a technical background",
-  "future_impact": "1-2 sentences on what this could lead to in the coming months/years",
-  "source_url": "Full verified URL to the original article",
-  "source_name": "Publication name (e.g. MIT Technology Review)",
+  "headline": "Clear, professional, factual headline",
+  "category": "ai|engineering|robotics|science|devtools|security|cloud|hardware|startups|research",
+  "category_label": "Human-readable label with emoji e.g. 🤖 Artificial Intelligence",
+  "impact_level": "🔴 High | 🟡 Medium | 🟢 Notable",
+  "summary": "2-3 factual sentences describing what happened",
+  "why_it_matters": "2-3 sentences on significance and implications",
+  "concept": "1-2 plain-English sentences for a non-technical reader",
+  "future_impact": "1-2 sentences on what this leads to",
+  "source_url": "Full verified https:// URL",
+  "source_name": "Publication name",
   "source_domain": "domain.com",
-  "social_angle": "One sentence: what angle makes this compelling for an Instagram post (no hashtags yet)"
+
+  // ── INDIVIDUAL SOCIAL CONTENT (self-contained per item) ──
+  "hook": "One punchy opening line for Instagram (no hashtags)",
+  "instagram_caption": "Full Instagram caption: hook + 4-6 short lines + call to action. Max 300 chars. Conversational, educational tone. No hashtags here.",
+  "hashtags": "#AI #TechNews #[CategoryTag] #TechPulseDaily (6-8 relevant hashtags)",
+  "linkedin_post": "150-200 word professional LinkedIn post. Headline + context + why it matters + question to audience.",
+  "twitter_post": "Tweet thread: 3 tweets numbered 1/ 2/ 3/. Each under 280 chars. Include source URL in last tweet."
 }}
 
 Rules:
-- Every field must be non-empty
-- Headlines must be factual and professional
-- Summaries must be accurate — do not exaggerate
-- Prioritize variety across categories (aim for 2 items per category)
-- Source URLs must be real and complete (https://...)
+- Every field must be populated — no empty strings
+- instagram_caption must be self-contained (readable without knowing anything else)
+- linkedin_post must be self-contained
+- twitter_post must be self-contained
 - No duplicate stories
-- No clickbait
+- No clickbait headlines
+- Aim for 2 items per category
+- Source URLs must be real and complete
 
-Return a JSON array of exactly 20 items. No markdown, no commentary — just the JSON array."""
+Return ONLY a valid JSON array of 20 items. No markdown, no commentary."""
 
-    message = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=12000,
+    msg = client.messages.create(
+        model="claude-opus-4-5", max_tokens=16000,
         messages=[{"role": "user", "content": prompt}],
     )
-
-    raw_json = message.content[0].text.strip()
-
-    # Strip any accidental markdown fences
-    if raw_json.startswith("```"):
-        raw_json = "\n".join(raw_json.split("\n")[1:])
-    if raw_json.endswith("```"):
-        raw_json = "\n".join(raw_json.split("\n")[:-1])
-
-    items = json.loads(raw_json)
-    log(f"  ↳ Generated {len(items)} items")
+    raw = msg.content[0].text.strip()
+    if raw.startswith("```"): raw = "\n".join(raw.split("\n")[1:])
+    if raw.endswith("```"):   raw = "\n".join(raw.split("\n")[:-1])
+    items = json.loads(raw)
+    log(f"  ↳ {len(items)} items generated")
     return items
 
 
-# ─────────────────────────────────────────────
-# File Generation
-# ─────────────────────────────────────────────
+# ── individual item file builder ──────────────────────────────────────────────
 
-def build_newsletter_md(items: list[dict], date: str, issue_num: int) -> str:
+def build_item_md(item, item_number, date, section_label):
+    emoji = CATEGORY_EMOJI.get(item["category"], "📌")
+    return f"""---
+title: "{item['headline'].replace('"', "'")}"
+date: {date}
+category: {item['category']}
+category_label: "{item.get('category_label', item['category'])}"
+impact: {item.get('impact_level', '🟡 Medium')}
+source_url: {item['source_url']}
+source_name: "{item.get('source_name', item.get('source_domain', 'Source'))}"
+item_number: {item_number}
+section: "{section_label}"
+---
+
+# {emoji} {item['headline']}
+
+> **{item.get('category_label', item['category'])}** · {item.get('impact_level', '🟡 Medium')} · {date}
+
+---
+
+## 📋 Summary
+{item['summary']}
+
+## 💡 Why It Matters
+{item['why_it_matters']}
+
+## 🔍 What Is This?
+{item['concept']}
+
+## 🔭 Looking Ahead
+{item['future_impact']}
+
+---
+
+## 📱 Instagram Slide
+
+**Hook:**
+{item['hook']}
+
+**Caption:**
+{item['instagram_caption']}
+
+**Hashtags:**
+{item['hashtags']}
+
+---
+
+## 💼 LinkedIn Post
+{item['linkedin_post']}
+
+---
+
+## 🐦 Twitter / X
+{item['twitter_post']}
+
+---
+
+**Source:** [{item.get('source_name', item.get('source_domain', 'Source'))}]({item['source_url']})
+*TechPulse Daily · {date} · Item {item_number}/20*
+"""
+
+
+# ── aggregate file builders ───────────────────────────────────────────────────
+
+def build_newsletter_md(items, date, issue_num):
     dt = datetime.fromisoformat(date)
-    date_long = dt.strftime("%A, %B %d, %Y")
-
-    # Category summary
-    cat_counts: dict[str, int] = {}
-    for item in items:
-        cat_counts[item.get("category_label", item["category"])] = (
-            cat_counts.get(item.get("category_label", item["category"]), 0) + 1
-        )
-    cat_summary = " | ".join(f"{k}: {v}" for k, v in cat_counts.items())
-
     lines = [
         f"# 🤖 TechPulse Daily — {date}",
         "",
-        f"> *Your daily briefing on AI, engineering, science & technology — {len(items)} stories curated from the last 24 hours.*",
+        f"> *Daily briefing on AI, engineering, science & technology — 20 stories · Issue #{issue_num}*",
         "",
-        f"**Issue #{issue_num} | {date_long}**",
+        f"**{dt.strftime('%A, %B %d, %Y')}**",
         "",
         "---",
         "",
-        "## 🗂️ Today's Categories",
+        "## 🗂️ Sections",
         "",
-        cat_summary,
+    ]
+    for _, label, _ in SECTIONS:
+        lines.append(f"- [{label}](#{slugify(label)})")
+    lines += ["", "---", ""]
+
+    # Group items by section
+    section_items = {cats[0]: [] for _, _, cats in SECTIONS}
+    assigned = set()
+    for _, _, cats in SECTIONS:
+        for item in items:
+            if item["category"] in cats and id(item) not in assigned:
+                section_items[cats[0]].append(item)
+                assigned.add(id(item))
+    # Remaining items go to last section
+    for item in items:
+        if id(item) not in assigned:
+            section_items[SECTIONS[-1][2][0]].append(item)
+            assigned.add(id(item))
+
+    item_counter = 1
+    for sec_key, sec_label, sec_cats in SECTIONS:
+        lines += [f"## {sec_label}", ""]
+        sec_items = section_items.get(sec_key, [])
+        for item in sec_items:
+            emoji = CATEGORY_EMOJI.get(item["category"], "📌")
+            slug = f"{item_counter:02d}-{item['category']}-{slugify(item['headline'])}"
+            lines += [
+                f"### {item_counter}. {emoji} {item['headline']}",
+                "",
+                f"**Category:** `{item.get('category_label', item['category'])}` | "
+                f"**Impact:** {item.get('impact_level','🟡 Medium')} | "
+                f"**Source:** [{item.get('source_name','Source')}]({item['source_url']}) | "
+                f"[📄 Full slide](./items/{slug}.md)",
+                "",
+                f"**Summary:** {item['summary']}",
+                "",
+                f"**Why It Matters:** {item['why_it_matters']}",
+                "",
+                f"**📱 Hook:** *{item['hook']}*",
+                "",
+                "---",
+                "",
+            ]
+            item_counter += 1
+        lines += [""]
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
+    lines += [
+        "## 📊 Stats",
+        "",
+        f"| Stories | {len(items)} |",
+        "|---------|---|",
+        f"| Sections | {len(SECTIONS)} |",
+        f"| Generated | {now} |",
+        "",
+        "---",
+        "*TechPulse Daily — automated, real timestamps, real sources.*",
+    ]
+    return "\n".join(lines)
+
+
+def build_digest_md(items, date):
+    lines = [
+        f"# ⚡ TechPulse Digest — {date}",
+        "",
+        f"*{len(items)}-story quick read · [Full newsletter](./newsletter.md)*",
         "",
         "---",
         "",
     ]
-
     for i, item in enumerate(items, 1):
-        emoji_map = {
-            "ai": "🤖", "engineering": "💻", "robotics": "🦾",
-            "science": "🔬", "devtools": "🛠️", "security": "🔐",
-            "cloud": "☁️", "hardware": "💾", "startups": "🚀",
-            "research": "📄",
-        }
-        emoji = emoji_map.get(item["category"], "📌")
+        slug = f"{i:02d}-{item['category']}-{slugify(item['headline'])}"
+        lines.append(
+            f"**{i}.** [{item['headline']}](./items/{slug}.md) "
+            f"{item.get('impact_level','🟡')} — "
+            f"*{item['summary'].split('.')[0]}.*"
+        )
+        lines.append("")
+    lines += ["---", "", f"*→ [Full newsletter](./newsletter.md) | [Sources](./sources.md)*"]
+    return "\n".join(lines)
 
+
+def build_social_md(items, date):
+    """Aggregated social file — each item links to its individual slide file."""
+    lines = [
+        f"# 📱 Social Posts — {date}",
+        "",
+        "*Each story has its own full slide file in `items/`. This is the quick-reference index.*",
+        "",
+        "---",
+        "",
+    ]
+    for i, item in enumerate(items, 1):
+        slug = f"{i:02d}-{item['category']}-{slugify(item['headline'])}"
+        emoji = CATEGORY_EMOJI.get(item["category"], "📌")
         lines += [
-            f"### {i}. {emoji} {item['headline']}",
+            f"## {i}. {emoji} {item['headline']}",
             "",
-            f"**Category:** `{item.get('category_label', item['category'])}` | "
-            f"**Impact:** {item.get('impact_level', '🟡 Medium')} | "
-            f"**Source:** [{item.get('source_name', item.get('source_domain', 'Source'))}]({item['source_url']})",
+            f"**[→ Full slide file](./items/{slug}.md)**",
             "",
-            "**Summary**",
-            item["summary"],
+            f"**Hook:** {item['hook']}",
             "",
-            "**Why It Matters**",
-            item["why_it_matters"],
-            "",
-            "**What Is This?** *(for the non-expert)*",
-            item["concept"],
-            "",
-            "**Looking Ahead**",
-            item["future_impact"],
-            "",
-            f"**📱 Social Angle:** *{item['social_angle']}*",
-            "",
-            f"> 🔗 [Read the full story]({item['source_url']}) | [{item.get('source_name', item.get('source_domain', ''))}]({item.get('source_domain', '')})",
+            f"**Hashtags:** {item['hashtags']}",
             "",
             "---",
             "",
         ]
-
-    # Footer stats
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-    lines += [
-        "## 📊 Issue Stats",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| Stories | {len(items)} |",
-        f"| Categories covered | {len(cat_counts)} |",
-        f"| Sources verified | {len(items)} |",
-        f"| Generated at | {now} |",
-        "",
-        "---",
-        "",
-        "## 🔗 Quick Links",
-        "",
-        "- [Full Source List](./sources.md)",
-        "- [Digest Version](./digest.md)",
-        "- [Social Posts](./social-posts.md)",
-        "- [Back to Index](./index.md)",
-        "",
-        "---",
-        "",
-        "*TechPulse Daily — generated automatically every day at 10:00 AM.*",
-        "*No fake timestamps. No backdated commits. Every story is real.*",
-    ]
-
+    lines += [f"*Generated by TechPulse Daily · {date}*"]
     return "\n".join(lines)
 
 
-def build_digest_md(items: list[dict], date: str) -> str:
-    lines = [
-        f"# ⚡ TechPulse Digest — {date}",
-        "",
-        f"*{len(items)}-story quick read. Full newsletter: [newsletter.md](./newsletter.md)*",
-        "",
-        "---",
-        "",
-    ]
-
-    for i, item in enumerate(items, 1):
-        impact = item.get("impact_level", "🟡")
-        lines += [
-            f"**{i}. {item['headline']}** {impact}",
-            f"*{item['summary'].split('.')[0]}.*",
-            f"[Source]({item['source_url']})",
-            "",
-        ]
-
-    top = items[0]["headline"] if items else "—"
-    lines += [
-        "---",
-        "",
-        f"**Today's Top Pick:** {top}",
-        "",
-        "*→ Full issue: [newsletter.md](./newsletter.md) | Sources: [sources.md](./sources.md)*",
-    ]
-
-    return "\n".join(lines)
-
-
-def build_social_posts_md(items: list[dict], date: str) -> str:
-    # Take top 6 for social posts
-    social_items = items[:6]
-
-    insta_posts = []
-    linkedin_posts = []
-    twitter_posts = []
-
-    for item in social_items:
-        # Instagram
-        insta_posts.append(
-            f"**Post — {item['category'].upper()}**\n\n"
-            f"{item['social_angle']}\n\n"
-            f"📌 {item['headline']}\n\n"
-            f"{item['summary'].split('.')[0]}.\n\n"
-            f"Why it matters: {item['why_it_matters'].split('.')[0]}.\n\n"
-            f"#TechNews #AI #Technology #Innovation #{item['category'].capitalize()}"
-        )
-
-        # LinkedIn
-        linkedin_posts.append(
-            f"**{item['headline']}**\n\n"
-            f"{item['summary']}\n\n"
-            f"💡 {item['why_it_matters']}\n\n"
-            f"🔗 {item['source_url']}\n\n"
-            f"#{item['category']} #TechPulseDaily #Technology"
-        )
-
-        # Twitter thread
-        twitter_posts.append(
-            f"🧵 **{item['headline']}**\n\n"
-            f"1/ {item['summary'].split('.')[0]}.\n\n"
-            f"2/ Why it matters: {item['why_it_matters'].split('.')[0]}.\n\n"
-            f"3/ What's next: {item['future_impact'].split('.')[0]}.\n\n"
-            f"Source: {item['source_url']}"
-        )
-
-    lines = [
-        f"# 📱 Social Posts — {date}",
-        "",
-        "*Ready-to-post drafts. Adapt tone and hashtags as needed.*",
-        "",
-        "---",
-        "",
-        "## 📸 Instagram Posts",
-        "",
-    ]
-    for i, post in enumerate(insta_posts, 1):
-        lines += [f"### Post {i}", "", post, "", "---", ""]
-
-    lines += ["## 💼 LinkedIn Posts", ""]
-    for i, post in enumerate(linkedin_posts, 1):
-        lines += [f"### Post {i}", "", post, "", "---", ""]
-
-    lines += ["## 🐦 Twitter / X Threads", ""]
-    for i, post in enumerate(twitter_posts, 1):
-        lines += [f"### Thread {i}", "", post, "", "---", ""]
-
-    lines += [
-        "",
-        f"*Generated by TechPulse Daily Automation | {date}*",
-        f"*Source: [Full Newsletter](./newsletter.md)*",
-    ]
-
-    return "\n".join(lines)
-
-
-def build_sources_md(items: list[dict], date: str) -> str:
+def build_sources_md(items, date):
     lines = [
         f"# 🔗 Sources — {date}",
         "",
-        f"*All {len(items)} sources verified and linked. Ordered by category.*",
-        "",
-        "| # | Headline | Domain | Category |",
+        f"| # | Headline | Domain | Category |",
         "|---|----------|--------|----------|",
     ]
-
     for i, item in enumerate(items, 1):
-        domain = item.get("source_domain", item.get("source_url", "—").split("/")[2] if "http" in item.get("source_url","") else "—")
-        lines.append(
-            f"| {i} | [{item['headline'][:60]}...]({item['source_url']}) "
-            f"| {domain} | {item['category']} |"
-        )
-
-    lines += [
-        "",
-        "---",
-        "",
-        f"*Sources fetched at {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}.*",
-        "*All URLs were verified at time of generation.*",
-    ]
-
+        domain = item.get("source_domain", "—")
+        title  = item["headline"][:55] + ("…" if len(item["headline"]) > 55 else "")
+        lines.append(f"| {i} | [{title}]({item['source_url']}) | {domain} | {item['category']} |")
+    lines += ["", f"*Fetched at {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}*"]
     return "\n".join(lines)
 
 
-def build_index_md(
-    items: list[dict],
-    date: str,
-    issue_num: int,
-    exec_time: float,
-    git_commit: str = "pending",
-) -> str:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+def build_index_md(items, date, issue_num, exec_time):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
+    prev = (datetime.fromisoformat(date) - timedelta(days=1)).strftime("%Y-%m-%d")
+    nxt  = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    cat_counts: dict[str, list[str]] = {}
+    cat_counts: dict = {}
     for item in items:
-        c = item.get("category_label", item["category"])
-        cat_counts.setdefault(c, []).append(item["headline"])
-
-    dt = datetime.fromisoformat(date)
-    prev_date = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
-    next_date = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
+        lbl = item.get("category_label", item["category"])
+        cat_counts[lbl] = cat_counts.get(lbl, 0) + 1
 
     cat_rows = "\n".join(
-        f"| {cat} | {len(headlines)} | {headlines[0][:50]}... |"
-        for cat, headlines in cat_counts.items()
+        f"| {k} | {v} |" for k, v in cat_counts.items()
+    )
+
+    item_links = "\n".join(
+        f"| {i:02d} | [{item['headline'][:55]}](./items/{i:02d}-{item['category']}-{slugify(item['headline'])}.md) | {item.get('category_label', item['category'])} |"
+        for i, item in enumerate(items, 1)
     )
 
     return f"""# 📋 Index — {date}
 
-**Issue #{issue_num} | Generated: {now}**
+**Issue #{issue_num} · Generated: {now}**
 
 ---
 
-## Files in This Issue
+## All Items (20 individual slide files)
 
-| File | Description |
-|------|-------------|
-| [newsletter.md](./newsletter.md) | Full newsletter — {len(items)} stories |
-| [digest.md](./digest.md) | Short digest version |
-| [social-posts.md](./social-posts.md) | Instagram / LinkedIn / Twitter drafts |
-| [sources.md](./sources.md) | All {len(items)} verified sources |
-| [index.md](./index.md) | This file |
+| # | Headline | Category |
+|---|----------|----------|
+{item_links}
 
 ---
 
 ## Category Breakdown
 
-| Category | Stories | Top Story |
-|----------|---------|-----------|
+| Category | Count |
+|----------|-------|
 {cat_rows}
 
 ---
 
-## Execution Metadata
+## Files
+
+| File | Description |
+|------|-------------|
+| [newsletter.md](./newsletter.md) | Full newsletter — 5 sections, 20 stories |
+| [digest.md](./digest.md) | One-line digest |
+| [social-posts.md](./social-posts.md) | Social index (links to item slides) |
+| [sources.md](./sources.md) | All {len(items)} sources |
+| [items/](./items/) | **{len(items)} individual story + slide files** |
+
+---
+
+## Metadata
 
 ```yaml
 date: {date}
 issue_number: {issue_num}
 generated_at: {now}
-execution_time: {exec_time:.1f}s
+exec_time: {exec_time:.1f}s
 item_count: {len(items)}
-source_count: {len(items)}
-categories_covered: {len(cat_counts)}
-git_commit: {git_commit}
-quality_checks_passed: true
+individual_slides: {len(items)}
+categories: {len(cat_counts)}
 ```
 
----
-
-*← [Previous Issue](../{prev_date}/index.md) | [All Issues](../../issues/) | [Next Issue](../{next_date}/index.md) →*
+*← [Previous]({prev}/index.md) | [All Issues](../../issues/) | [Next]({nxt}/index.md) →*
 """
 
 
-# ─────────────────────────────────────────────
-# Git Operations
-# ─────────────────────────────────────────────
-
-def commit_file(filepath: Path, message: str):
-    """Stage and commit a single file with a real timestamp."""
-    try:
-        run_git(["add", str(filepath)])
-        run_git(["commit", "-m", message, "--allow-empty"])
-        log(f"  ↳ Committed: {message}")
-    except subprocess.CalledProcessError as e:
-        log(f"  ↳ Commit skipped (nothing to commit): {e.stderr.strip()}", "WARN")
-
-
-def push_to_github():
-    """Push all commits to the remote."""
-    log("Pushing to GitHub...")
-    try:
-        run_git(["push", "origin", "main"])
-        log("  ↳ Push successful")
-    except subprocess.CalledProcessError as e:
-        log(f"  ↳ Push failed: {e.stderr.strip()}", "ERROR")
-        raise
-
-
-# ─────────────────────────────────────────────
-# Main Orchestrator
-# ─────────────────────────────────────────────
+# ── main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="TechPulse Daily Newsletter Generator")
-    parser.add_argument("--date", default=datetime.now().strftime("%Y-%m-%d"),
-                        help="Issue date (YYYY-MM-DD, default: today)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Generate files but do not commit or push")
-    parser.add_argument("--no-push", action="store_true",
-                        help="Commit but do not push to GitHub")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--date",     default=datetime.now().strftime("%Y-%m-%d"))
+    parser.add_argument("--dry-run",  action="store_true")
+    parser.add_argument("--no-push",  action="store_true")
     args = parser.parse_args()
 
-    date = args.date
-    start_time = time.time()
-    log(f"═══════════════════════════════════════")
-    log(f"  TechPulse Daily — {date}")
-    log(f"═══════════════════════════════════════")
+    date  = args.date
+    t0    = time.time()
+    log(f"═══ TechPulse Daily — {date} ═══")
 
-    # Setup
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        log("ANTHROPIC_API_KEY not set", "ERROR")
-        sys.exit(1)
+        log("ANTHROPIC_API_KEY not set", "ERROR"); sys.exit(1)
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client    = anthropic.Anthropic(api_key=api_key)
     issue_num = get_issue_number()
     issue_dir = ISSUES_DIR / date
-    issue_dir.mkdir(parents=True, exist_ok=True)
+    items_dir = issue_dir / "items"
+    items_dir.mkdir(parents=True, exist_ok=True)
+    log(f"Issue #{issue_num} → {issue_dir}")
 
-    log(f"Issue #{issue_num} | Output: {issue_dir}")
+    # ── 1. Fetch news ──
+    raw_news = fetch_news(client, date)
 
-    # Step 1: Fetch news
-    raw_news = fetch_news_raw(client, date)
+    # ── 2. Generate structured items ──
+    items = generate_items(client, raw_news, date)
+    items = deduplicate(items)
 
-    # Step 2: Generate structured items
-    items = generate_newsletter_items(client, raw_news, date)
-
-    # Step 3: Deduplicate
-    items = deduplicate_items(items)
-    log(f"After deduplication: {len(items)} items")
-
-    # Step 4: Quality check
+    # ── 3. Quality check ──
     passed, qc_issues = quality_check(items)
     if not passed:
-        log("Quality check FAILED:", "ERROR")
-        for issue in qc_issues:
-            log(f"  - {issue}", "ERROR")
-        if not args.dry_run:
-            sys.exit(1)
+        for i in qc_issues: log(f"  QC: {i}", "ERROR")
+        if not args.dry_run: sys.exit(1)
     else:
-        log(f"Quality check PASSED ({len(items)} items, all fields verified)")
+        log(f"Quality check passed ({len(items)} items)")
 
-    exec_time = time.time() - start_time
-
-    # Step 5: Build output files
-    log("Building output files...")
-
-    newsletter_content = build_newsletter_md(items, date, issue_num)
-    digest_content = build_digest_md(items, date)
-    social_content = build_social_posts_md(items, date)
-    sources_content = build_sources_md(items, date)
-    index_content = build_index_md(items, date, issue_num, exec_time)
-
-    files = {
-        "newsletter.md": newsletter_content,
-        "digest.md": digest_content,
-        "social-posts.md": social_content,
-        "sources.md": sources_content,
-        "index.md": index_content,
-    }
-
-    for filename, content in files.items():
-        path = issue_dir / filename
-        path.write_text(content, encoding="utf-8")
-        log(f"  ↳ Written: {filename} ({len(content)} chars)")
-
-    if args.dry_run:
-        log("Dry run complete. Files written, no commits made.")
-        return
-
-    # Step 6: Commit each file individually with meaningful messages
-    commit_map = {
-        "newsletter.md": f"daily: add {date} full newsletter ({len(items)} stories)",
-        "digest.md": f"daily: add {date} digest version",
-        "social-posts.md": f"daily: add {date} social media drafts",
-        "sources.md": f"daily: add {date} source references",
-        "index.md": f"daily: update {date} newsletter index",
-    }
-
-    # Also commit category-specific files
-    category_items: dict[str, list] = {}
+    # ── 4. Assign sections ──
+    section_map: dict = {}
+    assigned = set()
+    for sec_key, sec_label, sec_cats in SECTIONS:
+        for item in items:
+            if item["category"] in sec_cats and id(item) not in assigned:
+                section_map[id(item)] = sec_label
+                assigned.add(id(item))
     for item in items:
-        category_items.setdefault(item["category"], []).append(item)
+        if id(item) not in assigned:
+            section_map[id(item)] = SECTIONS[-1][1]
 
-    for filename, message in commit_map.items():
-        commit_file(issue_dir / filename, message)
+    exec_time = time.time() - t0
 
-    # Update CHANGELOG
-    changelog = REPO_ROOT / "CHANGELOG.md"
-    if changelog.exists():
-        existing = changelog.read_text(encoding="utf-8")
-        entry = (
-            f"\n## [{date}] — Issue #{issue_num}\n\n"
-            f"### Added\n"
-            f"- {len(items)} stories across {len(category_items)} categories\n"
-            f"- Generated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
-        )
-        changelog.write_text(
-            existing.replace("## [Unreleased]", f"## [Unreleased]\n{entry}"),
-            encoding="utf-8",
-        )
-        commit_file(changelog, f"meta: update CHANGELOG for {date}")
+    # ── 5. Write & commit individual item files (one per story) ──
+    log("Writing individual item files…")
+    for i, item in enumerate(items, 1):
+        sec_label = section_map[id(item)]
+        slug      = f"{i:02d}-{item['category']}-{slugify(item['headline'])}"
+        path      = items_dir / f"{slug}.md"
+        path.write_text(build_item_md(item, i, date, sec_label), encoding="utf-8")
 
-    # Step 7: Push
-    if not args.no_push:
-        push_to_github()
+        if not args.dry_run:
+            cat   = item["category"]
+            title = item["headline"][:60]
+            commit_file(path, f"news({cat}): {title}")
 
-    elapsed = time.time() - start_time
-    log(f"═══════════════════════════════════════")
-    log(f"  Done in {elapsed:.1f}s | Issue #{issue_num} | {len(items)} stories")
-    log(f"═══════════════════════════════════════")
+    # ── 6. Write & commit aggregate files ──
+    log("Writing aggregate files…")
+    agg_files = {
+        "newsletter.md":   build_newsletter_md(items, date, issue_num),
+        "digest.md":       build_digest_md(items, date),
+        "social-posts.md": build_social_md(items, date),
+        "sources.md":      build_sources_md(items, date),
+        "index.md":        build_index_md(items, date, issue_num, exec_time),
+    }
+    agg_messages = {
+        "newsletter.md":   f"daily: add {date} full newsletter ({len(items)} stories, 5 sections)",
+        "digest.md":       f"daily: add {date} digest version",
+        "social-posts.md": f"daily: add {date} social posts index",
+        "sources.md":      f"daily: add {date} source references",
+        "index.md":        f"daily: update {date} newsletter index",
+    }
+    for fname, content in agg_files.items():
+        path = issue_dir / fname
+        path.write_text(content, encoding="utf-8")
+        if not args.dry_run:
+            commit_file(path, agg_messages[fname])
+
+    # ── 7. Push ──
+    if not args.dry_run and not args.no_push:
+        log("Pushing to GitHub…")
+        try:
+            run_git(["push", "origin", "main"])
+            log("  ✔ Push successful")
+        except subprocess.CalledProcessError as e:
+            log(f"  ✘ Push failed: {e.stderr}", "ERROR"); raise
+
+    elapsed = time.time() - t0
+    log(f"═══ Done in {elapsed:.1f}s · Issue #{issue_num} · {len(items)} items · {len(items)} individual slides ═══")
 
 
 if __name__ == "__main__":
