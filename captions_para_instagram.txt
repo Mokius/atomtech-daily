@@ -1,0 +1,439 @@
+=== POST 01 — xAI Grok 4.3 on OCI Enterprise AI ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\01.jpg
+CAPTION:
+Grok 4.3 hits enterprise cloud — 1 million tokens, zero setup friction.
+
+xAI's Grok 4.3 reasoning model is now available on Oracle Cloud Infrastructure Enterprise AI, just one day after its public release.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#AI #Grok #xAI #EnterpriseAI #LLM #OracleCloud #TechNews #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 02 — Four Chinese Labs Release Open-Weight Coding Models ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\02.jpg
+CAPTION:
+4 frontier coding models, 12 days, 4 Chinese labs — the open-weight race is on.
+
+Four Chinese AI laboratories released open-weight coding models within a 12-day window: GLM-5.1, MiniMax M2.7, Kimi K2.6, and DeepSeek V4.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#OpenSource #AI #DeepSeek #LLM #CodingAI #MachineLearning #TechNews #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 03 — Google Releases Gemma 4 Open Models ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\03.jpg
+CAPTION:
+Google just open-sourced its best reasoning model yet — and it's free for commercial use.
+
+Google introduced Gemma 4, its latest open model series, under the Apache 2.0 license — free for commercial and research use.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#Google #Gemma #OpenSource #AI #LLM #AgenticAI #MachineLearning #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 04 — Stanford Manifold Steering for AI Behavioral Control ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\04.jpg
+CAPTION:
+AI safety gets a geometry upgrade — and it matters more than it sounds.
+
+Stanford researchers propose manifold steering — a geometry-aware AI intervention that produces more natural behavioral changes than conventional linear steering.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#AIResearch #MachineLearning #AIAlignment #Stanford #NeuralNetworks #AIScience #TechNews #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 05 — GitHub Copilot VS Code: BYOK, Semantic Search, Remote CLI ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\05.jpg
+CAPTION:
+Copilot just learned your whole codebase — and lets you bring your own keys.
+
+GitHub released a major Copilot VS Code update with BYOK support, semantic workspace search, /chronicle history, and remote CLI control.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#GitHubCopilot #VSCode #DevTools #AI #CodingTools #BYOK #DeveloperExperience #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 06 — Warp Terminal Goes Open Source Under AGPL ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\06.jpg
+CAPTION:
+Warp Terminal just open-sourced. Your terminal's secrets are now public knowledge.
+
+Warp, the AI-powered developer terminal, opened its client under the AGPLv3 license in early May 2026.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#OpenSource #WarpTerminal #DevTools #Rust #AGPL #DeveloperTools #Terminal #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 07 — GitHub CodeQL 2.25.3: Swift 6.3 + New C++ Queries ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\07.jpg
+CAPTION:
+CodeQL 2.25.3 drops — Swift 6.3 security analysis and 5 new C++ vulnerability detectors.
+
+GitHub released CodeQL 2.25.3 with Swift 6.3 support and five new default C/C++ security queries auto-enabled for all Advanced Security users.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#CodeQL #GitHub #SecurityTools #DevSecOps #StaticAnalysis #Swift #CPlusPlus #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 08 — IBM Think 2026: AI Operating Model + watsonx Orchestrate ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\08.jpg
+CAPTION:
+IBM just mapped out how enterprises should actually run AI — not just adopt it.
+
+At Think 2026, IBM announced next-gen watsonx Orchestrate, IBM Confluent, IBM Concert, IBM Sovereign Core, and an AI Operating Model Blueprint.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#IBM #EnterpriseAI #Think2026 #watsonx #MultiAgent #AIStrategy #HybridCloud #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 09 — Global Semiconductor Sales $298.5B in Q1 2026 ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\09.jpg
+CAPTION:
+$298.5 billion in chips — in a single quarter. The AI hardware wave is real.
+
+The SIA reported global semiconductor sales of $298.5 billion in Q1 2026 — a 25% increase from Q4 2025, driven by AI accelerator demand.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#Semiconductors #AI #Chips #Hardware #TechEconomy #NVIDIA #TSMC #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 10 — Scientists Achieve Quadsqueezing Quantum Effect ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\10.jpg
+CAPTION:
+Scientists just achieved a quantum effect theorized for decades — and finally proved real.
+
+Scientists achieved the first experimental demonstration of quadsqueezing — a fourth-order quantum effect enabling unprecedented quantum state control.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#QuantumPhysics #Quadsqueezing #QuantumComputing #Science #Physics #QuantumSensing #Breakthrough #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 11 — Depression Detectable via Blood Test ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\11.jpg
+CAPTION:
+A blood test for depression might actually be coming — and the science behind it is fascinating.
+
+A new study identifies biomarkers in immune cell aging patterns that correlate significantly with depression diagnosis.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#MentalHealth #Depression #Science #Biomarkers #MedicalResearch #ImmuneSystem #HealthScience #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 12 — Sunlight Converts Plastic to Hydrogen Fuel ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\12.jpg
+CAPTION:
+Scientists just figured out how to turn plastic trash into clean energy using sunlight.
+
+Scientists developed a photocatalytic process that uses sunlight to convert plastic waste directly into hydrogen fuel without combustion or toxic byproducts.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#CleanEnergy #Hydrogen #PlasticPollution #Science #Sustainability #Photocatalysis #GreenTech #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 13 — Ivanti EPMM Zero-Day CVE-2026-6973 Exploited ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\13.jpg
+CAPTION:
+Active exploit in the wild. Ivanti EPMM admins need to patch today — not tomorrow.
+
+CVE-2026-6973 in Ivanti EPMM is actively exploited; CISA added it to the Known Exploited Vulnerabilities catalog with a 3-day federal remediation mandate.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#Cybersecurity #Ivanti #CISA #ZeroDay #CVE #PatchNow #InfoSec #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 14 — Windows Zero-Click CVE-2026-32202 — May 12 Deadline ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\14.jpg
+CAPTION:
+No clicks needed. Windows vulnerability exploited just by being on the network.
+
+CVE-2026-32202, a zero-click Windows Shell authentication flaw, is actively exploited with a May 12 CISA remediation deadline for federal agencies.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#Windows #ZeroClick #Cybersecurity #CISA #Microsoft #CVE #InfoSec #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 15 — Vultr + SUSE + Supermicro Cloud-to-Edge AI Architecture ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\15.jpg
+CAPTION:
+Cloud-to-edge AI is the future — and three major players just made it dramatically simpler.
+
+Vultr, SUSE, and Supermicro launched a joint Cloud-to-Edge framework combining ruggedized hardware, GitOps Kubernetes, and localized cloud infrastructure.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#Kubernetes #EdgeAI #CloudComputing #SUSE #Supermicro #Vultr #DevOps #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 16 — Broadcom VMware Cloud Foundation 9.1 AI-Native ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\16.jpg
+CAPTION:
+Not everything belongs in the public cloud — VMware VCF 9.1 is making that argument with AI.
+
+Broadcom announced VCF 9.1 as an AI and Kubernetes-native private cloud platform for production AI workloads with AMD/Intel/NVIDIA hardware support.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#VMware #Broadcom #PrivateCloud #Kubernetes #EnterpriseAI #CloudInfrastructure #HybridCloud #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 17 — Sierra AI Raises $950M at $15.8B Valuation ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\17.jpg
+CAPTION:
+$950M raised. $15.8B valuation. Sierra AI is betting it can replace your customer service team.
+
+Sierra, the enterprise conversational AI company founded by Bret Taylor, raised $950 million at a $15.8 billion valuation.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#SierraAI #AIStartup #VentureCapital #CustomerExperience #EnterpriseAI #FundingNews #BretTaylor #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 18 — AGIBOT Open-Sources World 2026 Robotics Dataset ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\18.jpg
+CAPTION:
+The ImageNet moment for robots might be here — AGIBOT just dropped a massive open dataset.
+
+AGIBOT released the AGIBOT World 2026 dataset as open source — structured, annotated real-world robot interaction data for training embodied AI systems.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#Robotics #EmbodiedAI #OpenSource #PhysicalAI #RoboticsData #AGIBOT #MachineLearning #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 19 — NVIDIA Newton 1.0 Open Source Physics Engine for Robots ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\19.jpg
+CAPTION:
+NVIDIA just open-sourced the physics engine for teaching robots to have human-like hands.
+
+NVIDIA released Newton 1.0, an open source physics engine for dexterous robot manipulation with accurate collision detection and realistic contact physics.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#NVIDIA #Robotics #Newton #PhysicsSimulation #EmbodiedAI #OpenSource #RoboticManipulation #TechPulseDaily #AtomTechDaily
+
+======================================================================
+
+=== POST 20 — True Anomaly Closes $600M Series D for Space Drones ===
+IMAGEN: C:\techpulse-daily\issues\2026-05-09\instagram\20.jpg
+CAPTION:
+Space drones for missile defense just raised $600M. The new frontier of defense is orbital.
+
+True Anomaly closed a $600M Series D (total $1.1B) for its autonomous spacecraft program targeting space-based missile defense.
+
+🔗 Newsletter completo: github.com/Mokius/atomtech-daily
+📰 Fuentes de hoy:
+• arxiv.org
+• releasebot.io
+• semiconductors.org
+• sciencedaily.com
+• helpnetsecurity.com
+• bleepingcomputer.com
+• hpcwire.com
+• therobotreport.com
+
+#SpaceTech #DefenseTech #SpaceStartup #TrueAnomaly #SpaceForce #VentureCapital #Aerospace #TechPulseDaily #AtomTechDaily
+
+======================================================================
