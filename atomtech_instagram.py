@@ -1,11 +1,14 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 AtomTech Daily - Instagram Auto-Poster
 Lee el issue del dia, genera imagenes con DALL-E 3,
 compone texto encima y publica en @atomtech_daily.
 """
 
-import os, re, time, textwrap
+import os, re, time, textwrap, sys, io
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 from pathlib import Path
 from datetime import date
 from io import BytesIO
@@ -22,6 +25,11 @@ INSTAGRAM_PASS = os.environ.get("INSTAGRAM_PASSWORD")
 REPO_ROOT      = Path("C:/techpulse-daily")
 GITHUB_URL     = "github.com/Mokius/atomtech-daily"
 TODAY          = date.today().isoformat()
+# Si no existe issue de hoy, usar el mas reciente disponible
+_issues_root = REPO_ROOT / "issues"
+if not (_issues_root / TODAY).exists():
+    _available = sorted([d.name for d in _issues_root.iterdir() if d.is_dir()], reverse=True)
+    TODAY = _available[0] if _available else TODAY
 
 BRAND_COLOR = (0, 210, 255)
 WHITE       = (255, 255, 255)
@@ -349,11 +357,60 @@ def build_caption(story: dict, summary: str, domains: list) -> str:
 # ── Instagram ──────────────────────────────────────────────────────────────────
 
 def ig_login() -> Client:
-    cl           = Client()
+    """Login con session cacheada o por usuario/pass con device fingerprint fijo."""
+    cl = Client()
     session_file = REPO_ROOT / "ig_session.json"
+
+    # Fingerprint de dispositivo fijo para parecer un movil real
+    cl.set_settings({
+        "user_agent": (
+            "Instagram 269.0.0.18.75 Android (28/9; 411dpi; 1080x2220; "
+            "samsung; SM-G973F; beyond1; exynos9820; en_US; 367271823)"
+        ),
+        "device_settings": {
+            "app_version": "269.0.0.18.75",
+            "android_version": 28,
+            "android_release": "9",
+            "dpi": "411dpi",
+            "resolution": "1080x2220",
+            "manufacturer": "samsung",
+            "device": "SM-G973F",
+            "model": "beyond1",
+            "cpu": "exynos9820",
+            "version_code": "314665256",
+        },
+        "country": "ES",
+        "country_code": 34,
+        "locale": "es_ES",
+        "timezone_offset": 3600,
+    })
+
     if session_file.exists():
-        cl.load_settings(str(session_file))
-    cl.login(INSTAGRAM_USER, INSTAGRAM_PASS)
+        try:
+            cl.load_settings(str(session_file))
+            cl.login(INSTAGRAM_USER, INSTAGRAM_PASS)
+            cl.dump_settings(str(session_file))
+            print("   ✅ Login (session reutilizada) en @atomtech_daily")
+            return cl
+        except Exception:
+            pass  # sesion expirada, intentar login limpio
+
+    # Login limpio con delay para evitar rate limit
+    time.sleep(2)
+    try:
+        cl.login(INSTAGRAM_USER, INSTAGRAM_PASS)
+    except Exception as e:
+        err = str(e)
+        if "challenge_required" in err or "checkpoint" in err.lower():
+            print("   [!] Instagram pide verificacion. Sigue las instrucciones en la app.")
+            cl.challenge_resolve(cl.last_json)
+        elif "bad_password" in err.lower() or "BadPassword" in err:
+            print("   [!] Login bloqueado por IP. Solucion: abre la app de Instagram,")
+            print("       inicia sesion alli primero, y vuelve a ejecutar este script.")
+            raise SystemExit(1)
+        else:
+            raise
+
     cl.dump_settings(str(session_file))
     print("   ✅ Login en @atomtech_daily")
     return cl
@@ -362,12 +419,18 @@ def ig_login() -> Client:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--images-only", action="store_true",
+                        help="Solo genera imagenes, no publica en Instagram")
+    args, _ = parser.parse_known_args()
+
     print(f"\n⚡ AtomTech Daily — Instagram Poster · {TODAY}")
     print("=" * 52)
 
     issue_dir  = REPO_ROOT / "issues" / TODAY
     output_dir = issue_dir / "instagram"
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     if not issue_dir.exists():
         print(f"❌ No existe issue para hoy: {issue_dir}")
@@ -380,8 +443,13 @@ def main():
     print(f"   {len(stories)} historias · {len(domains)} fuentes")
 
     oai = OpenAI(api_key=OPENAI_API_KEY)
-    print("\n📱 Iniciando sesion en Instagram...")
-    ig  = ig_login()
+
+    if not args.images_only:
+        print("\n📱 Iniciando sesion en Instagram...")
+        ig  = ig_login()
+    else:
+        ig = None
+        print("\n🎨 Modo generacion de imagenes (sin publicar en Instagram)")
 
     for story in stories:
         n        = story["number"]
@@ -401,18 +469,24 @@ def main():
         final.save(str(img_path), "JPEG", quality=95)
         print(f"  💾 {img_path.name}")
 
-        # 3. Publicar
+        # 3. Publicar (solo si no es modo imágenes-only)
         summary = summaries.get(n, story["hook"])
         caption = build_caption(story, summary, domains)
-        print("  📸 Publicando...")
-        ig.photo_upload(str(img_path), caption=caption)
-        print("  ✅ Publicado.")
+        if ig is not None:
+            print("  📸 Publicando en Instagram...")
+            ig.photo_upload(str(img_path), caption=caption)
+            print("  ✅ Publicado.")
+            if n < len(stories):
+                print("  ⏳ 45s pausa...")
+                time.sleep(45)
+        else:
+            print(f"  💾 Imagen guardada: {img_path.name}")
 
-        if n < len(stories):
-            print("  ⏳ 45s...")
-            time.sleep(45)
-
-    print(f"\n🎉 {len(stories)} posts publicados en @atomtech_daily!")
+    if ig is not None:
+        print(f"\n🎉 {len(stories)} posts publicados en @atomtech_daily!")
+    else:
+        print(f"\n✅ {len(stories)} imagenes generadas en: {output_dir}")
+        print("   Para publicar en Instagram ejecuta sin --images-only")
 
 if __name__ == "__main__":
     main()
