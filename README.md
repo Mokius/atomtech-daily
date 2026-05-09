@@ -1,4 +1,4 @@
-# 🤖 TechPulse Daily — AI, Engineering & Science Newsletter
+# 🤖 AtomTech Daily — AI, Engineering & Science Newsletter
 
 > **A fully automated daily newsletter covering the most relevant developments in AI, software engineering, robotics, scientific breakthroughs, developer tools, cybersecurity, cloud infrastructure, hardware, and startups.**
 
@@ -10,7 +10,7 @@
 
 ## 📖 What Is This?
 
-**TechPulse Daily** is a real-time, automatically generated newsletter repository. Every day at **10:00 AM**, a scheduled workflow:
+**AtomTech Daily** is a real-time, automatically generated newsletter repository. Every day at **10:00 AM**, a scheduled workflow:
 
 1. Searches the web for the last 24 hours of news across 10 technology categories
 2. Filters and ranks stories by relevance, impact, and credibility
